@@ -1,0 +1,110 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Build:    dotnet build -c Release -p:KSPDir="C:\path\to\Kerbal Space Program"
+    Install:  add -p:InstallToKSP=true   (copies the mod into KSP's GameData)
+    Release:  add -p:Package=true        (creates release\BDArmoryCommandRPM-<version>.zip)
+    Or simply run build.bat from the repository root.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>BDArmoryCommandRPM</AssemblyName>
+    <RootNamespace>BDArmoryCommandRPM</RootNamespace>
+    <LangVersion>8.0</LangVersion>
+    <Version>0.10.1</Version>
+    <Product>BDArmoryCommandRPM</Product>
+    <Description>BDArmory Plus (and BDArmory Extended) on RasterPropMonitor MFDs</Description>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Nullable>disable</Nullable>
+    <DebugType>portable</DebugType>
+
+    <KSPManaged>$(KSPDir)\KSP_x64_Data\Managed</KSPManaged>
+    <BDArmoryDll>$(KSPDir)\GameData\BDArmory\Plugins\BDArmory.dll</BDArmoryDll>
+    <RPMDll>$(KSPDir)\GameData\JSI\RasterPropMonitor\Plugins\RasterPropMonitor.dll</RPMDll>
+    <ModDir>$(MSBuildProjectDirectory)\..\GameData\BDArmoryCommandRPM</ModDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Lets you build for net48 without the .NET Framework targeting pack installed -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(KSPManaged)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>$(KSPManaged)\Assembly-CSharp-firstpass.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="KSPAssets">
+      <HintPath>$(KSPManaged)\KSPAssets.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="RasterPropMonitor">
+      <HintPath>$(RPMDll)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="BDArmory">
+      <HintPath>$(BDArmoryDll)</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Every Unity module (UnityEngine.dll, UnityEngine.CoreModule.dll, ...) -->
+  <ItemGroup>
+    <Reference Include="$(KSPManaged)\UnityEngine*.dll">
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="CheckKSPDir" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(KSPManaged)\Assembly-CSharp.dll')"
+           Text="KSP not found in '$(KSPDir)'. Use -p:KSPDir=&quot;C:\path\to\Kerbal Space Program&quot;" />
+    <Error Condition="!Exists('$(BDArmoryDll)')"
+           Text="BDArmory.dll not found at '$(BDArmoryDll)'. Is BDArmory installed in GameData?" />
+    <Error Condition="!Exists('$(RPMDll)')"
+           Text="RasterPropMonitor.dll not found at '$(RPMDll)'. Is RasterPropMonitor installed?" />
+  </Target>
+
+  <ItemGroup>
+    <FontFiles Include="$(ModDir)\Fonts\*" />
+    <SettingsFiles Include="$(ModDir)\Settings.cfg" />
+    <PatchFiles Include="$(ModDir)\Patches\*.cfg" />
+    <DocFiles Include="$(MSBuildProjectDirectory)\..\README.md;$(MSBuildProjectDirectory)\..\LICENSE*" />
+  </ItemGroup>
+
+  <!-- Copies the DLL into the repository's GameData/BDArmoryCommandRPM/Plugins (and into KSP with -p:InstallToKSP=true) -->
+  <Target Name="CopyPlugin" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModDir)\Plugins" />
+    <Copy Condition="'$(InstallToKSP)' == 'true'" SourceFiles="$(TargetPath)" DestinationFolder="$(KSPDir)\GameData\BDArmoryCommandRPM\Plugins" />
+    <!-- the mod used to be called BDArmoryRPM: remove the old install so the two never load together -->
+    <RemoveDir Condition="'$(InstallToKSP)' == 'true'" Directories="$(KSPDir)\GameData\BDArmoryRPM" />
+    <Copy Condition="'$(InstallToKSP)' == 'true'" SourceFiles="@(PatchFiles)" DestinationFolder="$(KSPDir)\GameData\BDArmoryCommandRPM\Patches" />
+    <Copy Condition="'$(InstallToKSP)' == 'true'" SourceFiles="@(FontFiles)" DestinationFolder="$(KSPDir)\GameData\BDArmoryCommandRPM\Fonts" />
+    <!-- Settings.cfg only if it does not exist yet, so your own settings are kept -->
+    <Copy Condition="'$(InstallToKSP)' == 'true' And !Exists('$(KSPDir)\GameData\BDArmoryCommandRPM\Settings.cfg')" SourceFiles="@(SettingsFiles)" DestinationFolder="$(KSPDir)\GameData\BDArmoryCommandRPM" />
+  </Target>
+
+  <!-- Release zip: GameData/BDArmoryCommandRPM ready to drop into KSP, plus README and licences -->
+  <Target Name="PackageRelease" AfterTargets="CopyPlugin" Condition="'$(Package)' == 'true'">
+    <PropertyGroup>
+      <StageDir>$(MSBuildProjectDirectory)\obj\package</StageDir>
+      <ReleaseDir>$(MSBuildProjectDirectory)\..\release</ReleaseDir>
+    </PropertyGroup>
+    <RemoveDir Directories="$(StageDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(StageDir)\GameData\BDArmoryCommandRPM\Plugins" />
+    <Copy SourceFiles="@(PatchFiles)" DestinationFolder="$(StageDir)\GameData\BDArmoryCommandRPM\Patches" />
+    <Copy SourceFiles="@(FontFiles)" DestinationFolder="$(StageDir)\GameData\BDArmoryCommandRPM\Fonts" />
+    <Copy SourceFiles="@(SettingsFiles)" DestinationFolder="$(StageDir)\GameData\BDArmoryCommandRPM" />
+    <Copy SourceFiles="@(DocFiles)" DestinationFolder="$(StageDir)\GameData\BDArmoryCommandRPM" Condition="Exists('%(DocFiles.FullPath)')" />
+    <MakeDir Directories="$(ReleaseDir)" />
+    <ZipDirectory SourceDirectory="$(StageDir)" DestinationFile="$(ReleaseDir)\BDArmoryCommandRPM-$(Version).zip" Overwrite="true" />
+    <Message Importance="high" Text="Release package: $(ReleaseDir)\BDArmoryCommandRPM-$(Version).zip" />
+  </Target>
+
+</Project>

@@ -1,0 +1,11 @@
+# Build output
+Source/bin/
+Source/obj/
+release/
+
+# Generated at runtime by the mod
+GameData/BDArmoryCommandRPM/Labels/
+
+# IDE
+.vs/
+*.user
